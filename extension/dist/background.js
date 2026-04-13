@@ -63,8 +63,25 @@ let reconnectTimer = null;
 let reconnectAttempts = 0;
 const RECONNECT_BASE_DELAY = 2e3;
 const RECONNECT_MAX_DELAY = 5e3;
+const WINDOW_IDLE_TIMEOUT = 12e4;
 function getWorkspaceKey(workspace) {
   return workspace?.trim() || "default";
+}
+function armSessionIdleTimer(workspace) {
+  const session = sessions.get(workspace);
+  if (!session) return;
+  if (session.idleTimer) clearTimeout(session.idleTimer);
+  session.idleDeadlineAt = Date.now() + WINDOW_IDLE_TIMEOUT;
+  session.idleTimer = setTimeout(async () => {
+    const current = sessions.get(workspace);
+    if (!current) return;
+    try {
+      await chrome.windows.remove(current.windowId);
+    } catch {
+    } finally {
+      sessions.delete(workspace);
+    }
+  }, WINDOW_IDLE_TIMEOUT);
 }
 function isSafeNavigationUrl(url) {
   return url.startsWith("http://") || url.startsWith("https://");
@@ -143,8 +160,14 @@ async function getOrCreateSession(workspace, initialUrl) {
   const tabs = await chrome.tabs.query({ windowId: win.id });
   const tabId = tabs[0]?.id;
   if (!tabId) throw new Error("Failed to create automation tab");
-  const session = { windowId: win.id, tabId };
+  const session = {
+    windowId: win.id,
+    tabId,
+    idleTimer: null,
+    idleDeadlineAt: Date.now() + WINDOW_IDLE_TIMEOUT
+  };
   sessions.set(workspace, session);
+  armSessionIdleTimer(workspace);
   return session;
 }
 async function resolveTabId(cmd) {
@@ -160,6 +183,7 @@ async function handleNavigate(cmd) {
   }
   const workspace = getWorkspaceKey(cmd.workspace);
   const session = await getOrCreateSession(workspace, cmd.url);
+  armSessionIdleTimer(workspace);
   const tabId = session.tabId;
   await detach(tabId);
   await chrome.tabs.update(tabId, { url: cmd.url });
@@ -194,9 +218,12 @@ async function handleNavigate(cmd) {
 }
 async function handleExec(cmd) {
   if (!cmd.code) return { id: cmd.id, ok: false, error: "Missing code" };
+  const workspace = getWorkspaceKey(cmd.workspace);
+  armSessionIdleTimer(workspace);
   const tabId = await resolveTabId(cmd);
   try {
     const data = await evaluate(tabId, cmd.code);
+    armSessionIdleTimer(workspace);
     return { id: cmd.id, ok: true, data };
   } catch (err) {
     return { id: cmd.id, ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -219,6 +246,7 @@ async function handleCommand(cmd) {
 chrome.windows.onRemoved.addListener((windowId) => {
   for (const [workspace, session] of sessions.entries()) {
     if (session.windowId === windowId) {
+      if (session.idleTimer) clearTimeout(session.idleTimer);
       sessions.delete(workspace);
     }
   }

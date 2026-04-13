@@ -5,6 +5,8 @@ import * as cdp from './cdp';
 type Session = {
   windowId: number;
   tabId: number;
+  idleTimer: ReturnType<typeof setTimeout> | null;
+  idleDeadlineAt: number;
 };
 
 const sessions = new Map<string, Session>();
@@ -14,9 +16,28 @@ let reconnectAttempts = 0;
 
 const RECONNECT_BASE_DELAY = 2000;
 const RECONNECT_MAX_DELAY = 5000;
+const WINDOW_IDLE_TIMEOUT = 120000; // 120s
 
 function getWorkspaceKey(workspace?: string): string {
   return workspace?.trim() || 'default';
+}
+
+function armSessionIdleTimer(workspace: string): void {
+  const session = sessions.get(workspace);
+  if (!session) return;
+  if (session.idleTimer) clearTimeout(session.idleTimer);
+  session.idleDeadlineAt = Date.now() + WINDOW_IDLE_TIMEOUT;
+  session.idleTimer = setTimeout(async () => {
+    const current = sessions.get(workspace);
+    if (!current) return;
+    try {
+      await chrome.windows.remove(current.windowId);
+    } catch {
+      // Window may already be closed by user.
+    } finally {
+      sessions.delete(workspace);
+    }
+  }, WINDOW_IDLE_TIMEOUT);
 }
 
 function isSafeNavigationUrl(url: string): boolean {
@@ -107,8 +128,14 @@ async function getOrCreateSession(workspace: string, initialUrl?: string): Promi
   const tabId = tabs[0]?.id;
   if (!tabId) throw new Error('Failed to create automation tab');
 
-  const session = { windowId: win.id!, tabId };
+  const session: Session = {
+    windowId: win.id!,
+    tabId,
+    idleTimer: null,
+    idleDeadlineAt: Date.now() + WINDOW_IDLE_TIMEOUT,
+  };
   sessions.set(workspace, session);
+  armSessionIdleTimer(workspace);
   return session;
 }
 
@@ -127,6 +154,7 @@ async function handleNavigate(cmd: Command): Promise<Result> {
 
   const workspace = getWorkspaceKey(cmd.workspace);
   const session = await getOrCreateSession(workspace, cmd.url);
+  armSessionIdleTimer(workspace);
   const tabId = session.tabId;
 
   await cdp.detach(tabId);
@@ -165,9 +193,12 @@ async function handleNavigate(cmd: Command): Promise<Result> {
 
 async function handleExec(cmd: Command): Promise<Result> {
   if (!cmd.code) return { id: cmd.id, ok: false, error: 'Missing code' };
+  const workspace = getWorkspaceKey(cmd.workspace);
+  armSessionIdleTimer(workspace);
   const tabId = await resolveTabId(cmd);
   try {
     const data = await cdp.evaluate(tabId, cmd.code);
+    armSessionIdleTimer(workspace);
     return { id: cmd.id, ok: true, data };
   } catch (err) {
     return { id: cmd.id, ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -192,6 +223,7 @@ async function handleCommand(cmd: Command): Promise<Result> {
 chrome.windows.onRemoved.addListener((windowId) => {
   for (const [workspace, session] of sessions.entries()) {
     if (session.windowId === windowId) {
+      if (session.idleTimer) clearTimeout(session.idleTimer);
       sessions.delete(workspace);
     }
   }
