@@ -18,8 +18,41 @@ func NewMock() API {
 func (m *MockAPI) InvalidateHotListCache() {}
 
 func (m *MockAPI) InvalidateQuestionCache(string, []string) {}
+func (m *MockAPI) InvalidateSearchCache()                    {}
+func (m *MockAPI) FetchAnswerPreview(questionID, answerID string) (string, zhihu.AnswerItem, error) {
+	now := time.Now().Unix()
+	return "【Mock】问题 · " + questionID, zhihu.AnswerItem{
+		ID:           answerID,
+		Author:       "MockUser_A",
+		Voteup:       999,
+		CommentCount: 12,
+		CreatedTime:  now,
+		ContentHTML:  "<p>这是通过回答链接直接预览的 Mock 正文。</p>",
+	}, nil
+}
 
 func (m *MockAPI) PrepareQuestion(string) error { return nil }
+
+func (m *MockAPI) Search(query string, offset, limit int) ([]zhihu.SearchItem, error) {
+	if offset > 0 {
+		return nil, nil
+	}
+	n := min(max(1, limit), 5)
+	out := make([]zhihu.SearchItem, 0, n)
+	for i := 0; i < n; i++ {
+		qid := fmt.Sprintf("mock-search-q-%d", i+1)
+		out = append(out, zhihu.SearchItem{
+			Type:       "question",
+			Title:      fmt.Sprintf("【Mock 搜索】%s 结果 %d", query, i+1),
+			Excerpt:    "这是用于测试搜索页展示的摘要。",
+			Author:     "MockUser",
+			Voteup:     100 - i*3,
+			URL:        zhihu.BaseURL + "/question/" + qid,
+			QuestionID: qid,
+		})
+	}
+	return out, nil
+}
 
 func (m *MockAPI) FetchHot(limit int) ([]zhihu.HotItem, error) {
 	n := min(50, max(1, limit))

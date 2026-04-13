@@ -182,49 +182,93 @@ func (c *Client) send(action string, fields map[string]any) (json.RawMessage, er
 	if err := c.ensureDaemonRunning(); err != nil {
 		return nil, err
 	}
-	id := fmt.Sprintf("zhihu_tui_%d_%d", time.Now().UnixMilli(), c.cmdID.Add(1))
-	body := map[string]any{
-		"id":        id,
-		"action":    action,
-		"workspace": c.workspace,
-	}
-	for k, v := range fields {
-		body[k] = v
-	}
-	raw, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest(http.MethodPost, c.baseURL+"/command", bytes.NewReader(raw))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Zhihu-TUI", "1")
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode == http.StatusServiceUnavailable {
-		return nil, fmt.Errorf("扩展未连接：请启用 Browser Bridge 扩展")
-	}
-	var cr cmdResult
-	if err := json.Unmarshal(b, &cr); err != nil {
-		return nil, fmt.Errorf("daemon 响应解析失败: %w: %s", err, string(b[:min(len(b), 200)]))
-	}
-	if !cr.OK {
-		if cr.Error != "" {
-			return nil, fmt.Errorf("%s", cr.Error)
+	var lastErr error
+	for attempt := 0; attempt < 2; attempt++ {
+		id := fmt.Sprintf("zhihu_tui_%d_%d", time.Now().UnixMilli(), c.cmdID.Add(1))
+		body := map[string]any{
+			"id":        id,
+			"action":    action,
+			"workspace": c.workspace,
 		}
-		return nil, fmt.Errorf("daemon 命令失败")
+		for k, v := range fields {
+			body[k] = v
+		}
+		raw, err := json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequest(http.MethodPost, c.baseURL+"/command", bytes.NewReader(raw))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Zhihu-TUI", "1")
+
+		resp, err := c.http.Do(req)
+		if err != nil {
+			lastErr = err
+			if attempt == 0 && c.waitExtensionReconnect(2500*time.Millisecond) {
+				continue
+			}
+			return nil, err
+		}
+		b, readErr := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if readErr != nil {
+			lastErr = readErr
+			if attempt == 0 && c.waitExtensionReconnect(2500*time.Millisecond) {
+				continue
+			}
+			return nil, readErr
+		}
+		if resp.StatusCode == http.StatusServiceUnavailable {
+			lastErr = fmt.Errorf("扩展未连接：请启用 Browser Bridge 扩展")
+			if attempt == 0 && c.waitExtensionReconnect(2500*time.Millisecond) {
+				continue
+			}
+			return nil, lastErr
+		}
+
+		var cr cmdResult
+		if err := json.Unmarshal(b, &cr); err != nil {
+			return nil, fmt.Errorf("daemon 响应解析失败: %w: %s", err, string(b[:min(len(b), 200)]))
+		}
+		if !cr.OK {
+			e := strings.TrimSpace(cr.Error)
+			if e == "" {
+				e = "daemon 命令失败"
+			}
+			lastErr = fmt.Errorf("%s", e)
+			if attempt == 0 && isExtensionDisconnectMsg(e) && c.waitExtensionReconnect(2500*time.Millisecond) {
+				continue
+			}
+			return nil, lastErr
+		}
+		return cr.Data, nil
 	}
-	return cr.Data, nil
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, fmt.Errorf("daemon 命令失败")
+}
+
+func isExtensionDisconnectMsg(msg string) bool {
+	s := strings.ToLower(strings.TrimSpace(msg))
+	return strings.Contains(s, "extension disconnected") ||
+		strings.Contains(s, "扩展未连接") ||
+		strings.Contains(s, "extension send failed")
+}
+
+func (c *Client) waitExtensionReconnect(timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		ok, err := c.extensionConnected()
+		if err == nil && ok {
+			return true
+		}
+		time.Sleep(120 * time.Millisecond)
+	}
+	return false
 }
 
 // Navigate opens the automation tab to url (creates window on first use). Stores tabId for later exec.

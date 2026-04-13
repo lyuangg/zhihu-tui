@@ -52,6 +52,13 @@ func (c *Client) InvalidateHotListCache() {
 	c.removeHotListDiskFiles()
 }
 
+// InvalidateSearchCache 清除 search_v3 接口缓存（搜索页手动刷新时调用）。
+func (c *Client) InvalidateSearchCache() {
+	if c.defaultCache != nil {
+		c.defaultCache.invalidateMatching("/search_v3")
+	}
+}
+
 // InvalidateQuestionCache 清除该问题下 answers 分页缓存；answerIDs 非空时同时清除对应 root_comments 缓存。
 // questionID / answerID 为业务 id（与 API URL 中 PathEscape 一致）。
 func (c *Client) InvalidateQuestionCache(questionID string, answerIDs []string) {

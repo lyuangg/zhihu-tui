@@ -86,3 +86,59 @@ func resolveQuestionTitle(questionID string, raw *answersAPI) string {
 	}
 	return "问题 " + questionID
 }
+
+type answerDetailAPI struct {
+	ID           any    `json:"id"`
+	Content      string `json:"content"`
+	VoteupCount  int    `json:"voteup_count"`
+	CommentCount int    `json:"comment_count"`
+	CreatedTime  int64  `json:"created_time"`
+	Author       struct {
+		Name string `json:"name"`
+	} `json:"author"`
+	Question *struct {
+		Title string `json:"title"`
+	} `json:"question"`
+}
+
+// FetchAnswerPreview 按回答 ID 拉取单条回答详情，供「链接直达预览」使用。
+func (c *Client) FetchAnswerPreview(questionID, answerID string) (questionTitle string, answer AnswerItem, err error) {
+	inc := "content,voteup_count,comment_count,author,created_time,question"
+	u := fmt.Sprintf("%s/api/v4/answers/%s?include=%s",
+		BaseURL, url.PathEscape(answerID), url.QueryEscape(inc))
+	var raw answerDetailAPI
+	if c.jsonFromCache(u, &raw) {
+		return answerPreviewFromRaw(questionID, answerID, &raw), AnswerItem{
+			ID:           idString(raw.ID),
+			Author:       raw.Author.Name,
+			Voteup:       raw.VoteupCount,
+			CommentCount: raw.CommentCount,
+			ContentHTML:  raw.Content,
+			CreatedTime:  raw.CreatedTime,
+		}, nil
+	}
+	if err := c.PrepareAnswerPage(questionID, answerID); err != nil {
+		return "", AnswerItem{}, err
+	}
+	if err := c.getJSON(u, &raw); err != nil {
+		return "", AnswerItem{}, err
+	}
+	return answerPreviewFromRaw(questionID, answerID, &raw), AnswerItem{
+		ID:           idString(raw.ID),
+		Author:       raw.Author.Name,
+		Voteup:       raw.VoteupCount,
+		CommentCount: raw.CommentCount,
+		ContentHTML:  raw.Content,
+		CreatedTime:  raw.CreatedTime,
+	}, nil
+}
+
+func answerPreviewFromRaw(questionID, answerID string, raw *answerDetailAPI) string {
+	if raw != nil && raw.Question != nil && raw.Question.Title != "" {
+		return raw.Question.Title
+	}
+	if questionID != "" {
+		return "问题 " + questionID
+	}
+	return "回答 " + answerID
+}

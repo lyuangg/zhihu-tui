@@ -118,7 +118,7 @@ func (p *hotPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	resetYYLatchUnlessY(&p.lastY, k)
 
-	if n == 0 && k != "r" && k != "l" && k != "h" && k != "esc" && k != "left" && k != "right" && k != "y" && k != "e" && k != "o" {
+	if n == 0 && k != "r" && k != "l" && k != "h" && k != "esc" && k != "left" && k != "right" && k != "y" && k != "e" && k != "o" && k != "f" {
 		return p, nil
 	}
 
@@ -139,6 +139,8 @@ func (p *hotPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return p, nil
 		}
 		return p.openCurrentInBrowser()
+	case "f":
+		return p, cmdForward(newSearchPage(p.api, p.w, p.h))
 	case "e":
 		return p, execEditorCmd(p.plainTextForEditor())
 	case "y":

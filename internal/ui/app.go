@@ -61,6 +61,10 @@ func (a *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if km, ok := msg.(tea.KeyMsg); ok {
 		if shouldGlobalQuit(km) {
+			// 搜索页中 q 需要可输入，避免触发全局退出。
+			if _, ok := a.page.(*searchPage); ok && keyString(km) == "q" {
+				goto HANDLE_PAGE_KEY
+			}
 			return a, tea.Quit
 		}
 		if keyString(km) == "?" {
@@ -71,6 +75,7 @@ func (a *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+HANDLE_PAGE_KEY:
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		next, c := a.page.Update(msg)

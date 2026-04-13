@@ -76,7 +76,17 @@ func helpPageBody() string {
 
 	b.WriteString("【热榜】\n")
 	n("无返回；过滤中 Esc 先给列表")
+	w("f", "进入搜索页")
 	w("e / yy", "当前列表展示行；列表更多键见列表底")
+	b.WriteString("\n")
+
+	b.WriteString("【搜索】\n")
+	w("Esc", "返回上一层（搜索页仅 Esc 可返回）")
+	w("Enter", "输入框聚焦时执行搜索；若为问题/回答链接则直达预览")
+	w("Tab", "切换输入框与结果列表焦点")
+	w("r", "聚焦输入框，编辑关键词")
+	w("n / p", "搜索结果翻页")
+	w("l / →", "结果为问题/回答时进入问题页")
 	b.WriteString("\n")
 
 	b.WriteString("【问题】\n")

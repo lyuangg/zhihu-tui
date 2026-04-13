@@ -7,6 +7,20 @@ type hotDone struct {
 	err   error
 }
 
+type searchDone struct {
+	query  string
+	offset int
+	items  []zhihu.SearchItem
+	err    error
+}
+
+type searchLinkDone struct {
+	qid   string
+	qTitle string
+	ans   *zhihu.AnswerItem
+	err   error
+}
+
 type qDone struct {
 	title        string
 	answers      []zhihu.AnswerItem
