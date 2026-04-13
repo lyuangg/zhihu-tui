@@ -1,0 +1,32 @@
+zhihu-tui
+zhihu-tui-daemon
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test / coverage
+*.test
+*.out
+coverage.out
+cover.out
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Node (extension)
+node_modules/
+extension/node_modules/
+extension/dist/

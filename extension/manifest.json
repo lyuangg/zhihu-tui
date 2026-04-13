@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Zhihu TUI Bridge",
+  "version": "0.1.0",
+  "description": "Minimal browser bridge for zhihu-tui",
+  "permissions": [
+    "debugger",
+    "tabs",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
