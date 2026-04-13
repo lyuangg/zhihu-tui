@@ -9,6 +9,7 @@ type API interface {
 	Search(query string, offset, limit int) ([]zhihu.SearchItem, error)
 	InvalidateSearchCache()
 	FetchAnswerPreview(questionID, answerID string) (questionTitle string, answer zhihu.AnswerItem, err error)
+	FetchArticleDetail(articleID string) (zhihu.ArticleItem, error)
 
 	PrepareQuestion(questionID string) error
 	FetchQuestionPage(questionID string, offset, limit int) (title string, answers []zhihu.AnswerItem, isEnd bool, total int, err error)

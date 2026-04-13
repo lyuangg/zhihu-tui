@@ -86,7 +86,7 @@ func helpPageBody() string {
 	w("Tab", "切换输入框与结果列表焦点")
 	w("r", "聚焦输入框，编辑关键词")
 	w("n / p", "搜索结果翻页")
-	w("l / →", "结果为问题/回答时进入问题页")
+	w("l / →", "结果为问题/回答进入问题页；文章进入文章详情")
 	b.WriteString("\n")
 
 	b.WriteString("【问题】\n")

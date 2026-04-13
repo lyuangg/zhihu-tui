@@ -15,10 +15,10 @@ type searchDone struct {
 }
 
 type searchLinkDone struct {
-	qid   string
+	qid    string
 	qTitle string
-	ans   *zhihu.AnswerItem
-	err   error
+	ans    *zhihu.AnswerItem
+	err    error
 }
 
 type qDone struct {
@@ -47,4 +47,9 @@ type commentDone struct {
 
 type editorDoneMsg struct {
 	err error
+}
+
+type articleDone struct {
+	item zhihu.ArticleItem
+	err  error
 }

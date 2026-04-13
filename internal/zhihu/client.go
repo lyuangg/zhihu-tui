@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/lyuangg/zhihu-tui/internal/bridge"
@@ -19,6 +20,7 @@ type Client struct {
 	defaultCache *simpleTTLCache // 热榜等（内存）
 	answerCache  *lruTTLCache    // 问题回答列表 API，最近 100 条
 	commentCache *lruTTLCache    // root_comments，最近 1000 条
+	articleCache *lruTTLCache    // 专栏文章详情 API，最近 300 条
 	hotCacheDir  string          // 热榜落盘目录，如 $CACHE/zhihu-tui
 
 	debug   bool
@@ -32,6 +34,7 @@ func NewClient(b *bridge.Client) *Client {
 		defaultCache: newSimpleTTLCache(),
 		answerCache:  newLRUTTLCache(cacheLimitAnswers),
 		commentCache: newLRUTTLCache(cacheLimitComments),
+		articleCache: newLRUTTLCache(cacheLimitArticles),
 		hotCacheDir:  initHotCacheDir(),
 	}
 }
@@ -57,6 +60,14 @@ func (c *Client) InvalidateSearchCache() {
 	if c.defaultCache != nil {
 		c.defaultCache.invalidateMatching("/search_v3")
 	}
+}
+
+// InvalidateArticleCache 清除指定文章详情缓存。
+func (c *Client) InvalidateArticleCache(articleID string) {
+	if c == nil || strings.TrimSpace(articleID) == "" || c.articleCache == nil {
+		return
+	}
+	c.articleCache.invalidateMatching(articleDetailCacheKey(articleID))
 }
 
 // InvalidateQuestionCache 清除该问题下 answers 分页缓存；answerIDs 非空时同时清除对应 root_comments 缓存。
@@ -92,6 +103,11 @@ func (c *Client) cacheGet(url string) ([]byte, bool) {
 			return nil, false
 		}
 		return c.commentCache.get(url)
+	case isArticleDetailCacheURL(url):
+		if c.articleCache == nil {
+			return nil, false
+		}
+		return c.articleCache.get(url)
 	default:
 		if c.defaultCache == nil {
 			return nil, false
@@ -106,6 +122,8 @@ func (c *Client) cacheSet(url string, raw []byte) {
 		c.answerCache.set(url, raw, cacheTTL)
 	case isRootCommentsURL(url):
 		c.commentCache.set(url, raw, cacheTTL)
+	case isArticleDetailCacheURL(url):
+		c.articleCache.set(url, raw, cacheTTL)
 	default:
 		c.defaultCache.set(url, raw, cacheTTL)
 	}
@@ -194,5 +212,13 @@ func (c *Client) PrepareAnswerPage(questionID, answerID string) error {
 	u := fmt.Sprintf("%s/question/%s/answer/%s", BaseURL, questionID, answerID)
 	err := c.bridge.Navigate(u)
 	c.apiDebugNavigate("answer", u, err)
+	return err
+}
+
+// PrepareArticlePage opens an article page before article APIs.
+func (c *Client) PrepareArticlePage(articleID string) error {
+	u := fmt.Sprintf("https://zhuanlan.zhihu.com/p/%s", url.PathEscape(articleID))
+	err := c.bridge.Navigate(u)
+	c.apiDebugNavigate("article", u, err)
 	return err
 }

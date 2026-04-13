@@ -18,7 +18,7 @@ func NewMock() API {
 func (m *MockAPI) InvalidateHotListCache() {}
 
 func (m *MockAPI) InvalidateQuestionCache(string, []string) {}
-func (m *MockAPI) InvalidateSearchCache()                    {}
+func (m *MockAPI) InvalidateSearchCache()                   {}
 func (m *MockAPI) FetchAnswerPreview(questionID, answerID string) (string, zhihu.AnswerItem, error) {
 	now := time.Now().Unix()
 	return "【Mock】问题 · " + questionID, zhihu.AnswerItem{
@@ -28,6 +28,26 @@ func (m *MockAPI) FetchAnswerPreview(questionID, answerID string) (string, zhihu
 		CommentCount: 12,
 		CreatedTime:  now,
 		ContentHTML:  "<p>这是通过回答链接直接预览的 Mock 正文。</p>",
+	}, nil
+}
+
+func (m *MockAPI) FetchArticleDetail(articleID string) (zhihu.ArticleItem, error) {
+	now := time.Now().Unix()
+	id := articleID
+	if id == "" {
+		id = "mock-article-1"
+	}
+	return zhihu.ArticleItem{
+		ID:           id,
+		Title:        "【Mock 文章】测试文章详情页",
+		Author:       "MockAuthor",
+		Voteup:       321,
+		CommentCount: 18,
+		CreatedTime:  now - 86400,
+		UpdatedTime:  now - 3600,
+		ContentHTML: `<p>这是 Mock 文章正文第一段。</p>
+<p>第二段用于测试文章详情页渲染与阅读跳转。</p>`,
+		URL: "https://zhuanlan.zhihu.com/p/" + id,
 	}, nil
 }
 

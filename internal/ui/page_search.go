@@ -228,7 +228,7 @@ func (p *searchPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if p.input.Focused() {
 			break
 		}
-		return p.openAsQuestion()
+		return p.openSelected()
 	case "o":
 		if p.input.Focused() {
 			break
@@ -274,13 +274,45 @@ func (p *searchPage) currentItem() *zhihu.SearchItem {
 	return &p.items[p.idx]
 }
 
-func (p *searchPage) openAsQuestion() (tea.Model, tea.Cmd) {
+func (p *searchPage) openSelected() (tea.Model, tea.Cmd) {
 	it := p.currentItem()
-	if it == nil || strings.TrimSpace(it.QuestionID) == "" {
-		p.errStr = "当前结果无法进入问题页（非问题/回答）"
+	if it == nil {
 		return p, nil
 	}
-	return p, cmdForward(newQuestionPage(p.api, p.w, p.h, it.QuestionID))
+	switch strings.TrimSpace(it.Type) {
+	case "article":
+		aid := parseArticleIDFromURL(it.URL)
+		if aid == "" {
+			p.errStr = "当前文章没有有效 ID"
+			return p, nil
+		}
+		return p, cmdForward(newArticlePage(p.api, p.w, p.h, aid))
+	default:
+		if strings.TrimSpace(it.QuestionID) == "" {
+			p.errStr = "当前结果无法进入详情页"
+			return p, nil
+		}
+		return p, cmdForward(newQuestionPage(p.api, p.w, p.h, it.QuestionID))
+	}
+}
+
+func parseArticleIDFromURL(raw string) string {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return ""
+	}
+	host := strings.ToLower(strings.TrimSpace(u.Hostname()))
+	if host != "zhuanlan.zhihu.com" && host != "www.zhihu.com" {
+		return ""
+	}
+	path := strings.Trim(strings.TrimSpace(u.EscapedPath()), "/")
+	if strings.HasPrefix(path, "p/") {
+		return strings.TrimSpace(strings.TrimPrefix(path, "p/"))
+	}
+	if strings.HasPrefix(path, "zhuanlan/p/") {
+		return strings.TrimSpace(strings.TrimPrefix(path, "zhuanlan/p/"))
+	}
+	return ""
 }
 
 func (p *searchPage) openInBrowser() (tea.Model, tea.Cmd) {

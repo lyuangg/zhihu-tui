@@ -13,6 +13,7 @@ const cacheTTL = 24 * time.Hour
 const (
 	cacheLimitAnswers  = 100
 	cacheLimitComments = 1000
+	cacheLimitArticles = 300
 )
 
 type cacheEnt struct {
@@ -154,6 +155,17 @@ func isAnswersAPIURL(u string) bool {
 
 func isRootCommentsURL(u string) bool {
 	return strings.Contains(u, "/root_comments")
+}
+
+// articleDetailCacheKeyPrefix 文章详情仅走专栏页 DOM，缓存键不用真实 HTTP URL。
+const articleDetailCacheKeyPrefix = "zhihu-tui:article-detail:"
+
+func articleDetailCacheKey(articleID string) string {
+	return articleDetailCacheKeyPrefix + strings.TrimSpace(articleID)
+}
+
+func isArticleDetailCacheURL(u string) bool {
+	return strings.HasPrefix(u, articleDetailCacheKeyPrefix)
 }
 
 func stringsContainsHotLists(u string) bool {
