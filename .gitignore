@@ -29,4 +29,3 @@ cover.out
 # Node (extension)
 node_modules/
 extension/node_modules/
-extension/dist/
