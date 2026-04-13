@@ -147,6 +147,15 @@ func (c *Client) jsonFromCache(apiURL string, v any) bool {
 			}
 		}
 	}
+	if stringsContainsRecommend(apiURL) {
+		if b, ok := c.loadRecommendFromFile(apiURL); ok {
+			if json.Unmarshal(b, v) == nil {
+				c.cacheSet(apiURL, b)
+				c.apiDebugPush("json·cache(disk)", apiURL, len(b), b, nil)
+				return true
+			}
+		}
+	}
 	return false
 }
 
@@ -185,6 +194,9 @@ func (c *Client) getJSONHot(url string, v any) error {
 	c.cacheSet(url, payload)
 	if stringsContainsHotLists(url) {
 		c.saveHotListToFile(url, payload)
+	}
+	if stringsContainsRecommend(url) {
+		c.saveRecommendToFile(url, payload)
 	}
 	err := json.Unmarshal(payload, v)
 	c.apiDebugPush("getJSONHot·fetch", url, len(payload), payload, err)

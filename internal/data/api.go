@@ -6,6 +6,8 @@ import "github.com/lyuangg/zhihu-tui/internal/zhihu"
 type API interface {
 	FetchHot(limit int) ([]zhihu.HotItem, error)
 	InvalidateHotListCache()
+	FetchRecommend(limit int) ([]zhihu.RecommendItem, error)
+	InvalidateRecommendCache()
 	Search(query string, offset, limit int) ([]zhihu.SearchItem, error)
 	InvalidateSearchCache()
 	FetchAnswerPreview(questionID, answerID string) (questionTitle string, answer zhihu.AnswerItem, err error)

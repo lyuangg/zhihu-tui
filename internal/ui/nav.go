@@ -26,6 +26,8 @@ func NavPageName(cur tea.Model) string {
 	switch cur.(type) {
 	case *hotPage:
 		return "热榜"
+	case *recommendPage:
+		return "推荐"
 	case *questionPage:
 		return "问题"
 	case *answerPage:

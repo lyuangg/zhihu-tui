@@ -76,8 +76,16 @@ func helpPageBody() string {
 
 	b.WriteString("【热榜】\n")
 	n("无返回；过滤中 Esc 先给列表")
+	w("R", "进入推荐页（大写 R）")
 	w("f", "进入搜索页")
 	w("e / yy", "当前列表展示行；列表更多键见列表底")
+	b.WriteString("\n")
+
+	b.WriteString("【推荐】\n")
+	w("Esc / h / ←", "返回热榜")
+	w("r", "强制刷新（清缓存后重拉）")
+	w("Enter / l / →", "问题进问题页；回答进回答预览；文章进文章页")
+	w("o / e / yy", "同搜索页条目")
 	b.WriteString("\n")
 
 	b.WriteString("【搜索】\n")

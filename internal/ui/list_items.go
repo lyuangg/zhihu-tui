@@ -102,3 +102,32 @@ func (i searchListItem) Description() string {
 	}
 	return fmt.Sprintf("%s  ·  %s", author, desc)
 }
+
+type recommendListItem struct {
+	it zhihu.RecommendItem
+}
+
+func (i recommendListItem) FilterValue() string {
+	return strings.TrimSpace(i.it.Title + " " + i.it.Excerpt + " " + i.it.Author + " " + i.it.Type)
+}
+
+func (i recommendListItem) Title() string {
+	t := listTitleOneLine(strings.TrimSpace(i.it.Title))
+	typ := listTitleOneLine(strings.TrimSpace(i.it.Type))
+	if typ != "" {
+		return fmt.Sprintf("%s  ·  %s", t, typ)
+	}
+	return t
+}
+
+func (i recommendListItem) Description() string {
+	desc := listTitleOneLine(strings.TrimSpace(i.it.Excerpt))
+	author := listTitleOneLine(strings.TrimSpace(i.it.Author))
+	if author == "" {
+		return desc
+	}
+	if i.it.Voteup > 0 {
+		return fmt.Sprintf("%s  ·  %s  ·  ▲ %d", author, desc, i.it.Voteup)
+	}
+	return fmt.Sprintf("%s  ·  %s", author, desc)
+}

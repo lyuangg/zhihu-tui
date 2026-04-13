@@ -50,6 +50,7 @@ func newHotList() list.Model {
 		extraShortHelp: func() []key.Binding {
 			return []key.Binding{
 				key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "刷新")),
+				key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "推荐")),
 				key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "搜索")),
 				key.NewBinding(key.WithKeys("l", "enter", "right"), key.WithHelp("l/enter", "进入问题")),
 				key.NewBinding(key.WithKeys("yy"), key.WithHelp("yy", "复制")),
@@ -98,6 +99,27 @@ func newCommentList() list.Model {
 				key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "上页评论")),
 				key.NewBinding(key.WithKeys("l", "enter", "right"), key.WithHelp("l/enter", "阅读评论")),
 				key.NewBinding(key.WithKeys("yy"), key.WithHelp("yy", "复制")),
+			}
+		},
+	})
+}
+
+func newRecommendList() list.Model {
+	return newZhihuList(zhihuListCfg{
+		title:              "推荐",
+		showTitle:          true,
+		itemDesc:           true,
+		itemHeight:         2,
+		itemSpacing:        0,
+		showStatusBar:      false,
+		noItemsPaddingLeft: true,
+		extraShortHelp: func() []key.Binding {
+			return []key.Binding{
+				key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "刷新")),
+				key.NewBinding(key.WithKeys("l", "enter", "right"), key.WithHelp("l/enter", "打开")),
+				key.NewBinding(key.WithKeys("yy"), key.WithHelp("yy", "复制")),
+				key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "浏览器打开")),
+				key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "外部编辑器")),
 			}
 		},
 	})

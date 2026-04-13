@@ -7,6 +7,18 @@ type hotDone struct {
 	err   error
 }
 
+type recommendDone struct {
+	items []zhihu.RecommendItem
+	err   error
+}
+
+type recommendAnswerDone struct {
+	qid    string
+	qTitle string
+	ans    *zhihu.AnswerItem
+	err    error
+}
+
 type searchDone struct {
 	query  string
 	offset int

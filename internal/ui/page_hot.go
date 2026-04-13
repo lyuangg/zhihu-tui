@@ -118,11 +118,13 @@ func (p *hotPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	resetYYLatchUnlessY(&p.lastY, k)
 
-	if n == 0 && k != "r" && k != "l" && k != "h" && k != "esc" && k != "left" && k != "right" && k != "y" && k != "e" && k != "o" && k != "f" {
+	if n == 0 && k != "r" && k != "R" && k != "l" && k != "h" && k != "esc" && k != "left" && k != "right" && k != "y" && k != "e" && k != "o" && k != "f" {
 		return p, nil
 	}
 
 	switch k {
+	case "R":
+		return p, cmdForward(newRecommendPage(p.api, p.w, p.h))
 	case "r":
 		p.loading = true
 		p.errStr = ""

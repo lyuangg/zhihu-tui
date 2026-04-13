@@ -17,6 +17,51 @@ func NewMock() API {
 
 func (m *MockAPI) InvalidateHotListCache() {}
 
+func (m *MockAPI) InvalidateRecommendCache() {}
+
+func (m *MockAPI) FetchRecommend(limit int) ([]zhihu.RecommendItem, error) {
+	n := min(50, max(1, limit))
+	count := min(n, 4)
+	out := make([]zhihu.RecommendItem, 0, count)
+	for i := 0; i < count; i++ {
+		qid := fmt.Sprintf("mock-rec-q-%d", i+1)
+		switch i % 3 {
+		case 0:
+			out = append(out, zhihu.RecommendItem{
+				Type:       "question",
+				Title:      fmt.Sprintf("【Mock 推荐】问题 %d", i+1),
+				Excerpt:    "Mock 摘要。",
+				Author:     "MockUser",
+				Voteup:     50 - i,
+				URL:        zhihu.BaseURL + "/question/" + qid,
+				QuestionID: qid,
+			})
+		case 1:
+			out = append(out, zhihu.RecommendItem{
+				Type:       "answer",
+				Title:      fmt.Sprintf("【Mock 推荐】回答 %d", i+1),
+				Excerpt:    "回答摘要。",
+				Author:     "Answerer",
+				Voteup:     120,
+				URL:        fmt.Sprintf("%s/question/%s/answer/mock-rec-a-%d", zhihu.BaseURL, qid, i),
+				QuestionID: qid,
+				AnswerID:   fmt.Sprintf("mock-rec-a-%d", i),
+			})
+		default:
+			aid := fmt.Sprintf("mock-rec-article-%d", i)
+			out = append(out, zhihu.RecommendItem{
+				Type:    "article",
+				Title:   fmt.Sprintf("【Mock 推荐】文章 %d", i+1),
+				Excerpt: "文章摘要。",
+				Author:  "专栏作者",
+				Voteup:  200,
+				URL:     "https://zhuanlan.zhihu.com/p/" + aid,
+			})
+		}
+	}
+	return out, nil
+}
+
 func (m *MockAPI) InvalidateQuestionCache(string, []string) {}
 func (m *MockAPI) InvalidateSearchCache()                   {}
 func (m *MockAPI) FetchAnswerPreview(questionID, answerID string) (string, zhihu.AnswerItem, error) {
