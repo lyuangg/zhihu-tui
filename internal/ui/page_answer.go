@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 // answerBodySideCol 正文左侧指示列宽度（焦点在正文时为竖线，在评论时为空格占位，总宽仍为 w）
@@ -75,6 +76,51 @@ func newAnswerPage(api data.API, w, h int, qid, qTitle string, answers []zhihu.A
 	return p
 }
 
+// answerQuestionHead 问题标题与问题页链接同一行：标题按终端宽度截断，链接始终完整不截断。
+func (p *answerPage) answerQuestionHead() string {
+	qid := strings.TrimSpace(p.qid)
+	t := collapseText(strings.TrimSpace(p.qTitle))
+	w := effectiveTermWidth(p.w)
+	if w < 1 {
+		w = 80
+	}
+	const sep = "  ·  "
+	sepW := runewidth.StringWidth(sep)
+
+	if qid == "" {
+		if t == "" {
+			return ""
+		}
+		tr := runewidth.Truncate(t, w, "…")
+		return titleStyle.Render(tr) + "\n\n"
+	}
+
+	u := fmt.Sprintf("%s/question/%s", zhihu.BaseURL, url.PathEscape(qid))
+	urlW := runewidth.StringWidth(u)
+
+	if t == "" {
+		return subStyle.Render(u) + "\n\n"
+	}
+
+	budget := w - sepW - urlW
+	var titleShown string
+	if budget < 1 {
+		titleShown = ""
+	} else if runewidth.StringWidth(t) <= budget {
+		titleShown = t
+	} else {
+		titleShown = runewidth.Truncate(t, max(1, budget), "…")
+	}
+
+	var line string
+	if titleShown == "" {
+		line = subStyle.Render(u)
+	} else {
+		line = subStyle.Render(titleShown) + sep + subStyle.Render(u)
+	}
+	return line + "\n\n"
+}
+
 // answerViewMeta 与 View 里 viewport 之上的元信息一致，用于按真实行数分配正文/评论区高度，避免总高度超过 p.h 把评论区裁出屏幕。
 func (p *answerPage) answerViewMeta() string {
 	if p.curAnswer == nil {
@@ -82,6 +128,7 @@ func (p *answerPage) answerViewMeta() string {
 	}
 	var b strings.Builder
 	a := p.curAnswer
+	b.WriteString(p.answerQuestionHead())
 	_, _ = fmt.Fprintf(&b, "%s  ·  ▲ %d  ·  评论约 %d 条\n\n", a.Author, a.Voteup, a.CommentCount)
 	b.WriteString("\n")
 	if p.errStr != "" {
@@ -471,6 +518,7 @@ func (p *answerPage) View() string {
 	a := p.curAnswer
 	if p.loading {
 		var b strings.Builder
+		b.WriteString(p.answerQuestionHead())
 		_, _ = fmt.Fprintf(&b, "%s  ·  ▲ %d  ·  评论约 %d 条\n\n", a.Author, a.Voteup, a.CommentCount)
 		b.WriteString(p.loadSpin.View())
 		b.WriteString(" ")
