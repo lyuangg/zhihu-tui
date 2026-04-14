@@ -170,24 +170,40 @@ func (m *MockAPI) FetchQuestionPage(questionID string, offset, limit int) (strin
 }
 
 func (m *MockAPI) FetchAnswerRootComments(questionID, answerID string, offset, limit int) ([]zhihu.CommentItem, bool, error) {
-	if offset > 0 {
-		return nil, true, nil
-	}
 	now := time.Now().Unix()
-	return []zhihu.CommentItem{
-		{
-			ID:      "c1",
-			Author:  "路人甲",
-			Content: `<p>Mock 评论：<b>赞</b>一下界面。</p>`,
-			Likes:   12,
-			Time:    now,
-		},
-		{
-			ID:      "c2",
-			Author:  "路人乙",
-			Content: `<p>第二条评论，测试多行。</p>`,
-			Likes:   3,
-			Time:    now - 120,
-		},
-	}, true, nil
+	pageSize := max(1, limit)
+	// 与真实接口一致：首屏满页 + is_end=false，便于用 n 测「下一页」刷新
+	if offset == 0 {
+		out := make([]zhihu.CommentItem, pageSize)
+		for i := range out {
+			n := i + 1
+			out[i] = zhihu.CommentItem{
+				ID:      fmt.Sprintf("mock-c-%d", n),
+				Author:  fmt.Sprintf("MockUser_%d", n),
+				Content: fmt.Sprintf(`<p>第 1 页 Mock 评论 #%d</p>`, n),
+				Likes:   i,
+				Time:    now - int64(i*30),
+			}
+		}
+		return out, false, nil
+	}
+	if offset == pageSize {
+		return []zhihu.CommentItem{
+			{
+				ID:      "mock-c-next-1",
+				Author:  "路人甲",
+				Content: `<p>第 2 页 Mock 评论 A</p>`,
+				Likes:   5,
+				Time:    now,
+			},
+			{
+				ID:      "mock-c-next-2",
+				Author:  "路人乙",
+				Content: `<p>第 2 页 Mock 评论 B</p>`,
+				Likes:   2,
+				Time:    now - 90,
+			},
+		}, true, nil
+	}
+	return nil, true, nil
 }

@@ -132,7 +132,7 @@ func (p *answerPage) answerViewMeta() string {
 	_, _ = fmt.Fprintf(&b, "%s  ·  ▲ %d  ·  评论约 %d 条\n\n", a.Author, a.Voteup, a.CommentCount)
 	b.WriteString("\n")
 	if p.errStr != "" {
-		b.WriteString(errStyle.Render("评论加载: "+p.errStr) + "\n\n")
+		b.WriteString(errStyle.Render(p.errStr) + "\n\n")
 	}
 	return b.String()
 }
@@ -235,7 +235,7 @@ func (p *answerPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ansDone:
 		p.loading = false
 		if msg.err != nil && msg.md == "" {
-			p.errStr = msg.err.Error()
+			p.errStr = "加载回答失败：" + msg.err.Error()
 			return p, nil
 		}
 		if msg.md != "" {
@@ -254,23 +254,24 @@ func (p *answerPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			p.cIdx = 0
 		}
 		if msg.err != nil {
-			p.errStr = msg.err.Error()
+			p.errStr = "加载评论失败：" + msg.err.Error()
 		} else {
 			p.errStr = ""
 		}
-		p.reloadCommentItems()
 		p.applySizes()
+		p.reloadCommentItems()
 		return p, nil
 
 	case commentDone:
 		p.loading = false
 		if msg.err != nil {
-			p.errStr = msg.err.Error()
+			p.errStr = "加载评论失败：" + msg.err.Error()
 			return p, nil
 		}
 		p.errStr = ""
 		if len(msg.items) == 0 && msg.offset > 0 && len(p.comments) > 0 {
 			p.cEnd = true
+			p.errStr = "没有更多评论，已停留在当前页"
 			return p, nil
 		}
 		p.comments = msg.items
@@ -279,8 +280,8 @@ func (p *answerPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.offset >= 0 {
 			p.cOff = msg.offset
 		}
-		p.reloadCommentItems()
 		p.applySizes()
+		p.reloadCommentItems()
 		return p, nil
 
 	case editorDoneMsg:
@@ -449,18 +450,25 @@ func (p *answerPage) commentPageKey(k string) (tea.Model, tea.Cmd) {
 	case "n":
 		fullPage := n >= commentLimit
 		if !p.cEnd || fullPage {
+			p.errStr = ""
 			nextOff := p.cOff + commentLimit
 			p.loading = true
 			return p, tea.Batch(p.fetchCommentPageCmd(nextOff), func() tea.Msg { return p.loadSpin.Tick() })
 		}
+		p.errStr = "已在最后一页评论"
+		return p, nil
 	case "p":
 		if p.cOff >= commentLimit {
+			p.errStr = ""
 			prevOff := p.cOff - commentLimit
 			p.loading = true
 			return p, tea.Batch(p.fetchCommentPageCmd(prevOff), func() tea.Msg { return p.loadSpin.Tick() })
 		}
+		p.errStr = "已在第一页评论"
+		return p, nil
+	default:
+		return p, nil
 	}
-	return p, nil
 }
 
 func (p *answerPage) openCurrentAnswerInBrowser() (tea.Model, tea.Cmd) {
