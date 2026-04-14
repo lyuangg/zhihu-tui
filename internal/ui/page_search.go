@@ -192,6 +192,7 @@ func (p *searchPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			p.errStr = ""
 			return p, tea.Batch(p.fetchSearchCmd(q, 0), func() tea.Msg { return p.loadSpin.Tick() })
 		}
+		return p.openSelected()
 	case "r":
 		p.input.Focus()
 		return p, nil
