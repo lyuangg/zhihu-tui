@@ -230,6 +230,7 @@ func (p *answerPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		p.h = msg.Height
 		p.applySizes()
 		p.reflowBodyMarkdown()
+		p.applyCommentListSelection()
 		return p, nil
 
 	case ansDone:
@@ -324,7 +325,22 @@ func (p *answerPage) reloadCommentItems() {
 	if p.cIdx >= len(p.comments) {
 		p.cIdx = max(0, len(p.comments)-1)
 	}
-	p.cList.Select(p.cIdx)
+	p.applyCommentListSelection()
+}
+
+// applyCommentListSelection 同步评论 bubbles 列表的选中态：焦点在正文时不高亮任一条（Select(-1)），避免误以为焦点在评论区。
+func (p *answerPage) applyCommentListSelection() {
+	if p.cIdx >= len(p.comments) {
+		p.cIdx = max(0, len(p.comments)-1)
+	}
+	if len(p.comments) == 0 {
+		return
+	}
+	if p.focusComments {
+		p.cList.Select(p.cIdx)
+	} else {
+		p.cList.Select(-1)
+	}
 }
 
 func (p *answerPage) reflowBodyMarkdown() {
@@ -376,6 +392,7 @@ func (p *answerPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return p, cmdBack()
 	case "tab":
 		p.focusComments = !p.focusComments
+		p.applyCommentListSelection()
 		return p, nil
 	case "o":
 		return p.openCurrentAnswerInBrowser()
@@ -420,6 +437,7 @@ func (p *answerPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// k：评论列表已在顶部继续 k → 回到正文并上移视口
 	if p.focusComments && k == "k" && !p.cList.SettingFilter() && p.commentListAtTop() {
 		p.focusComments = false
+		p.applyCommentListSelection()
 		var cmd tea.Cmd
 		p.vp, cmd = p.vp.Update(msg)
 		return p, cmd
@@ -545,8 +563,6 @@ func (p *answerPage) View() string {
 }
 
 // commentListView 渲染评论列表。
-// 之前未聚焦时通过 Select(n) 取消高亮会触发越界索引，导致偶发空列表显示。
-// 这里统一直接渲染当前 cList，保证首屏稳定可见。
 func (p *answerPage) commentListView() string {
 	return p.cList.View()
 }
