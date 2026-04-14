@@ -177,14 +177,38 @@ func (m *MockAPI) FetchAnswerRootComments(questionID, answerID string, offset, l
 		out := make([]zhihu.CommentItem, pageSize)
 		for i := range out {
 			n := i + 1
-			out[i] = zhihu.CommentItem{
+			cc := n % 4
+			item := zhihu.CommentItem{
 				ID:                fmt.Sprintf("mock-c-%d", n),
 				Author:            fmt.Sprintf("MockUser_%d", n),
 				Content:           fmt.Sprintf(`<p>第 1 页 Mock 评论 #%d</p>`, n),
 				VoteCount:         i,
-				ChildCommentCount: n % 4,
+				ChildCommentCount: cc,
 				Time:              now - int64(i*30),
 			}
+			if cc > 0 {
+				item.ChildComments = []zhihu.CommentItem{
+					{
+						ID:        fmt.Sprintf("mock-c-%d-sub-1", n),
+						Author:    "子评甲",
+						ReplyTo:   item.Author,
+						Content:   `<p>mock 子评论</p>`,
+						VoteCount: 2,
+						Time:      now - 40,
+					},
+				}
+				if cc > 1 {
+					item.ChildComments = append(item.ChildComments, zhihu.CommentItem{
+						ID:        fmt.Sprintf("mock-c-%d-sub-2", n),
+						Author:    "子评乙",
+						ReplyTo:   "子评甲",
+						Content:   `再回复一层`,
+						VoteCount: 1,
+						Time:      now - 20,
+					})
+				}
+			}
+			out[i] = item
 		}
 		return out, false, nil
 	}
@@ -197,6 +221,9 @@ func (m *MockAPI) FetchAnswerRootComments(questionID, answerID string, offset, l
 				VoteCount:         5,
 				ChildCommentCount: 3,
 				Time:              now,
+				ChildComments: []zhihu.CommentItem{
+					{ID: "mock-sub-a1", Author: "回A1", ReplyTo: "路人甲", Content: "子评", VoteCount: 1, Time: now},
+				},
 			},
 			{
 				ID:                "mock-c-next-2",

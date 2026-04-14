@@ -97,7 +97,25 @@ func newCommentList() list.Model {
 			return []key.Binding{
 				key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "下页评论")),
 				key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "上页评论")),
-				key.NewBinding(key.WithKeys("l", "enter", "right"), key.WithHelp("l/enter", "阅读评论")),
+				key.NewBinding(key.WithKeys("l", "enter", "right"), key.WithHelp("l/enter", "评论详情")),
+				key.NewBinding(key.WithKeys("yy"), key.WithHelp("yy", "复制")),
+			}
+		},
+	})
+}
+
+func newCommentDetailList() list.Model {
+	return newZhihuList(zhihuListCfg{
+		title:              "子评论",
+		showTitle:          true,
+		itemDesc:           true,
+		itemHeight:         2,
+		itemSpacing:        0,
+		showStatusBar:      false,
+		noItemsPaddingLeft: true,
+		extraShortHelp: func() []key.Binding {
+			return []key.Binding{
+				key.NewBinding(key.WithKeys("l", "enter", "right"), key.WithHelp("l/enter", "阅读全文")),
 				key.NewBinding(key.WithKeys("yy"), key.WithHelp("yy", "复制")),
 			}
 		},

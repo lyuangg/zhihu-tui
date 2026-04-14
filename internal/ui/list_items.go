@@ -64,7 +64,12 @@ func (i commentListItem) FilterValue() string {
 
 func (i commentListItem) Title() string {
 	au := listTitleOneLine(i.c.Author)
-	meta := fmt.Sprintf("▲ %d · ↳ %d", i.c.VoteCount, i.c.ChildCommentCount)
+	var meta string
+	if i.c.ReplyTo != "" {
+		meta = fmt.Sprintf("→ %s · ▲ %d", listTitleOneLine(i.c.ReplyTo), i.c.VoteCount)
+	} else {
+		meta = fmt.Sprintf("▲ %d · ↳ %d", i.c.VoteCount, i.c.ChildCommentCount)
+	}
 	if ts := formatCommentTime(i.c.Time); ts != "" {
 		return fmt.Sprintf("%s · %s · %s", ts, au, meta)
 	}

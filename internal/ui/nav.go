@@ -36,6 +36,8 @@ func NavPageName(cur tea.Model) string {
 		return "文章"
 	case *readerPage:
 		return "阅读"
+	case *commentDetailPage:
+		return "评论详情"
 	case *helpPage:
 		return "帮助"
 	case *searchPage:
