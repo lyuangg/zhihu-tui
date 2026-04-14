@@ -18,4 +18,5 @@ type API interface {
 	InvalidateQuestionCache(questionID string, answerIDs []string)
 
 	FetchAnswerRootComments(questionID, answerID string, offset, limit int) ([]zhihu.CommentItem, bool, error)
+	FetchCommentChildComments(questionID, answerID, commentID string, offset, limit int) ([]zhihu.CommentItem, bool, error)
 }

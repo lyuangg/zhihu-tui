@@ -237,3 +237,38 @@ func (m *MockAPI) FetchAnswerRootComments(questionID, answerID string, offset, l
 	}
 	return nil, true, nil
 }
+
+func (m *MockAPI) FetchCommentChildComments(questionID, answerID, commentID string, offset, limit int) ([]zhihu.CommentItem, bool, error) {
+	_ = questionID
+	_ = answerID
+	_ = commentID
+	now := time.Now().Unix()
+	pageSize := max(1, limit)
+	if offset == 0 {
+		out := make([]zhihu.CommentItem, min(5, pageSize))
+		for i := range out {
+			out[i] = zhihu.CommentItem{
+				ID:        fmt.Sprintf("mock-child-full-%d", i+1),
+				Author:    fmt.Sprintf("子评_%d", i+1),
+				ReplyTo:   "楼主",
+				Content:   fmt.Sprintf(`<p>child_comments 接口第 1 页 #%d</p>`, i+1),
+				VoteCount: i,
+				Time:      now - int64(i*10),
+			}
+		}
+		return out, len(out) < pageSize, nil
+	}
+	if offset == pageSize {
+		return []zhihu.CommentItem{
+			{
+				ID:        "mock-child-full-next",
+				Author:    "翻页子评",
+				ReplyTo:   "楼主",
+				Content:   `<p>子评论第 2 页</p>`,
+				VoteCount: 1,
+				Time:      now,
+			},
+		}, true, nil
+	}
+	return nil, true, nil
+}

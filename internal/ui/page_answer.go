@@ -397,7 +397,7 @@ func (p *answerPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if isOpenKey(k) {
 		if p.focusComments && len(p.comments) > 0 && p.cIdx < len(p.comments) && p.curAnswer != nil {
 			c := p.comments[p.cIdx]
-			return p, cmdForward(newCommentDetailPage(p.w, p.h, c.Content, c.ChildComments, commentDetailHead{
+			return p, cmdForward(newCommentDetailPage(p.api, p.w, p.h, p.qid, p.curAnswer.ID, c.ID, c.Content, c.ChildComments, commentDetailHead{
 				Author:            c.Author,
 				VoteCount:         c.VoteCount,
 				ChildCommentCount: c.ChildCommentCount,

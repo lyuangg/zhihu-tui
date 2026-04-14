@@ -115,6 +115,8 @@ func newCommentDetailList() list.Model {
 		noItemsPaddingLeft: true,
 		extraShortHelp: func() []key.Binding {
 			return []key.Binding{
+				key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "下页")),
+				key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "上页")),
 				key.NewBinding(key.WithKeys("l", "enter", "right"), key.WithHelp("l/enter", "阅读全文")),
 				key.NewBinding(key.WithKeys("yy"), key.WithHelp("yy", "复制")),
 			}

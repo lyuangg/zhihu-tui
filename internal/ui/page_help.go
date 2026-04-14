@@ -112,6 +112,7 @@ func helpPageBody() string {
 
 	b.WriteString("【评论详情】\n")
 	w("Tab", "原评论正文 / 子评论列表")
+	w("n / p", "子评论翻页（root 内嵌仅预览，完整列表为 child_comments 接口）")
 	w("l / Enter", "阅读全文（正文或子评论）")
 	w("Esc / h / ←", "返回回答")
 	b.WriteString("\n")

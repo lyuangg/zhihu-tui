@@ -4,15 +4,17 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/lyuangg/zhihu-tui/internal/data"
 	"github.com/lyuangg/zhihu-tui/internal/zhihu"
 
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// commentDetailHead 为顶栏展示用元信息，与正文、子评论均由回答页传入，详情页不请求接口。
+// commentDetailHead 为顶栏展示用元信息；子评论完整列表通过 FetchCommentChildComments 分页拉取（root_comments 内嵌仅预览）。
 type commentDetailHead struct {
 	Author            string
 	VoteCount         int
@@ -21,6 +23,11 @@ type commentDetailHead struct {
 }
 
 type commentDetailPage struct {
+	api       data.API
+	qid       string
+	aid       string
+	commentID string
+
 	w, h        int
 	contentHTML string
 	head        commentDetailHead
@@ -31,26 +38,37 @@ type commentDetailPage struct {
 
 	children []zhihu.CommentItem
 	cIdx     int
+	cOff     int
+	cEnd     bool
 
-	cList  list.Model
-	errStr string
-	lastY  bool
+	cList    list.Model
+	loading  bool
+	errStr   string
+	lastY    bool
+	loadSpin spinner.Model
 }
 
-// newCommentDetailPage 仅渲染传入的正文与子评论列表，不发起网络请求。
-func newCommentDetailPage(w, h int, contentHTML string, children []zhihu.CommentItem, head commentDetailHead) *commentDetailPage {
+// newCommentDetailPage 用回答页传入的正文与内嵌预览初始化；若 child_comment_count>0 则再请求 child_comments 接口拉全部分页。
+func newCommentDetailPage(api data.API, w, h int, qid, aid, commentID, contentHTML string, previewChildren []zhihu.CommentItem, head commentDetailHead) *commentDetailPage {
 	vp := viewport.New(0, 0)
 	vp.Style = lipgloss.NewStyle().Padding(0, 1)
-	ch := append([]zhihu.CommentItem(nil), children...)
+	ch := append([]zhihu.CommentItem(nil), previewChildren...)
+	needFetch := strings.TrimSpace(commentID) != "" && head.ChildCommentCount > 0
 	p := &commentDetailPage{
+		api:          api,
+		qid:          qid,
+		aid:          aid,
+		commentID:    strings.TrimSpace(commentID),
 		w:            w,
 		h:            h,
 		contentHTML:  contentHTML,
 		head:         head,
 		vp:           vp,
 		cList:        newCommentDetailList(),
-		focusReplies: len(ch) > 0,
 		children:     ch,
+		loading:      needFetch,
+		focusReplies: len(ch) > 0,
+		loadSpin:     newLoadSpinner(),
 	}
 	p.applySizes()
 	p.reflowParentBody()
@@ -114,7 +132,21 @@ func (p *commentDetailPage) applySizes() {
 	p.cList.SetSize(w, listH)
 }
 
-func (p *commentDetailPage) Init() tea.Cmd { return nil }
+func (p *commentDetailPage) Init() tea.Cmd {
+	if !p.loading {
+		return nil
+	}
+	return tea.Batch(
+		func() tea.Msg {
+			items, end, err := p.api.FetchCommentChildComments(p.qid, p.aid, p.commentID, 0, commentChildLimit)
+			if err != nil {
+				return commentDone{err: err, offset: -1}
+			}
+			return commentDone{items: items, isEnd: end, offset: 0}
+		},
+		func() tea.Msg { return p.loadSpin.Tick() },
+	)
+}
 
 func (p *commentDetailPage) reloadChildItems() {
 	items := make([]list.Item, len(p.children))
@@ -128,6 +160,20 @@ func (p *commentDetailPage) reloadChildItems() {
 	p.cList.Select(p.cIdx)
 }
 
+func (p *commentDetailPage) fetchChildPageCmd(offset int) tea.Cmd {
+	qid := p.qid
+	aid := p.aid
+	cid := p.commentID
+	api := p.api
+	return func() tea.Msg {
+		cc, cEnd, err := api.FetchCommentChildComments(qid, aid, cid, offset, commentChildLimit)
+		if err != nil {
+			return commentDone{err: err, offset: -1}
+		}
+		return commentDone{items: cc, isEnd: cEnd, offset: offset}
+	}
+}
+
 func (p *commentDetailPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -137,10 +183,44 @@ func (p *commentDetailPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		p.reflowParentBody()
 		return p, nil
 
+	case commentDone:
+		p.loading = false
+		if msg.err != nil {
+			p.errStr = "加载子评论失败：" + msg.err.Error()
+			p.focusReplies = len(p.children) > 0
+			p.applySizes()
+			return p, nil
+		}
+		p.errStr = ""
+		if len(msg.items) == 0 && msg.offset > 0 && len(p.children) > 0 {
+			p.cEnd = true
+			p.errStr = "没有更多子评论，已停留在当前页"
+			return p, nil
+		}
+		p.children = msg.items
+		p.cEnd = msg.isEnd
+		p.cIdx = 0
+		if msg.offset >= 0 {
+			p.cOff = msg.offset
+		}
+		p.focusReplies = len(p.children) > 0
+		p.applySizes()
+		p.reloadChildItems()
+		return p, nil
+
 	case editorDoneMsg:
 		applyEditorDoneMsg(&p.errStr, msg)
 		p.applySizes()
 		return p, nil
+	}
+
+	if p.loading {
+		var spinCmd tea.Cmd
+		p.loadSpin, spinCmd = p.loadSpin.Update(msg)
+		if key, ok := msg.(tea.KeyMsg); ok && shouldGlobalQuit(key) {
+			return p, tea.Quit
+		}
+		return p, spinCmd
 	}
 
 	switch msg := msg.(type) {
@@ -201,6 +281,12 @@ func (p *commentDetailPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return p, nil
 	}
 
+	if k == "n" || k == "p" {
+		if p.head.ChildCommentCount > 0 && strings.TrimSpace(p.commentID) != "" {
+			return p.childCommentPageKey(k)
+		}
+	}
+
 	if isOpenKey(k) {
 		if p.focusReplies && len(p.children) > 0 && p.cIdx < len(p.children) {
 			c := p.children[p.cIdx]
@@ -252,6 +338,33 @@ func (p *commentDetailPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return p, cmd
 }
 
+func (p *commentDetailPage) childCommentPageKey(k string) (tea.Model, tea.Cmd) {
+	n := len(p.children)
+	switch k {
+	case "n":
+		fullPage := n >= commentChildLimit
+		if !p.cEnd || fullPage {
+			p.errStr = ""
+			nextOff := p.cOff + commentChildLimit
+			p.loading = true
+			return p, tea.Batch(p.fetchChildPageCmd(nextOff), func() tea.Msg { return p.loadSpin.Tick() })
+		}
+		p.errStr = "已在最后一页子评论"
+		return p, nil
+	case "p":
+		if p.cOff >= commentChildLimit {
+			p.errStr = ""
+			prevOff := p.cOff - commentChildLimit
+			p.loading = true
+			return p, tea.Batch(p.fetchChildPageCmd(prevOff), func() tea.Msg { return p.loadSpin.Tick() })
+		}
+		p.errStr = "已在第一页子评论"
+		return p, nil
+	default:
+		return p, nil
+	}
+}
+
 func (p *commentDetailPage) plainTextForEditor() string {
 	if p.focusReplies && len(p.children) > 0 && p.cIdx >= 0 && p.cIdx < len(p.children) {
 		c := p.children[p.cIdx]
@@ -284,6 +397,18 @@ func (p *commentDetailPage) copyYY() (tea.Model, tea.Cmd) {
 }
 
 func (p *commentDetailPage) View() string {
+	if p.loading {
+		var b strings.Builder
+		b.WriteString(p.detailViewMeta())
+		b.WriteString(p.vp.View())
+		b.WriteString("\n")
+		b.WriteString(p.loadSpin.View())
+		b.WriteString(" ")
+		b.WriteString(subStyle.Render("加载子评论…"))
+		b.WriteString("\n")
+		return b.String()
+	}
+
 	var b strings.Builder
 	b.WriteString(p.detailViewMeta())
 	b.WriteString(p.vp.View())

@@ -153,8 +153,8 @@ func isAnswersAPIURL(u string) bool {
 	return strings.Contains(u, "/answers?")
 }
 
-func isRootCommentsURL(u string) bool {
-	return strings.Contains(u, "/root_comments")
+func isCommentsListURL(u string) bool {
+	return strings.Contains(u, "/root_comments") || strings.Contains(u, "/child_comments")
 }
 
 // articleDetailCacheKeyPrefix 文章详情仅走专栏页 DOM，缓存键不用真实 HTTP URL。

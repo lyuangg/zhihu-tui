@@ -98,7 +98,7 @@ func (c *Client) cacheGet(url string) ([]byte, bool) {
 			return nil, false
 		}
 		return c.answerCache.get(url)
-	case isRootCommentsURL(url):
+	case isCommentsListURL(url):
 		if c.commentCache == nil {
 			return nil, false
 		}
@@ -120,7 +120,7 @@ func (c *Client) cacheSet(url string, raw []byte) {
 	switch {
 	case isAnswersAPIURL(url):
 		c.answerCache.set(url, raw, cacheTTL)
-	case isRootCommentsURL(url):
+	case isCommentsListURL(url):
 		c.commentCache.set(url, raw, cacheTTL)
 	case isArticleDetailCacheURL(url):
 		c.articleCache.set(url, raw, cacheTTL)
