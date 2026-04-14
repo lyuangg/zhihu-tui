@@ -401,7 +401,7 @@ func (p *answerPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if ts := formatCommentTime(c.Time); ts != "" {
 				meta += "  ·  " + ts
 			}
-			meta += fmt.Sprintf("  ·  ▲ %d", c.Likes)
+			meta += fmt.Sprintf("  ·  ▲ %d  ·  ↳ %d", c.VoteCount, c.ChildCommentCount)
 			content := normalizeCRLF(HTMLToTerminalMarkdown(c.Content, p.w))
 			return p, cmdForward(newReaderPage("评论全文", meta, content, p.w, p.h))
 		}

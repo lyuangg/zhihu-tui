@@ -6,20 +6,22 @@ import (
 )
 
 type CommentItem struct {
-	ID      string
-	Author  string
-	Content string
-	Likes   int
-	Time    int64
+	ID                string
+	Author            string
+	Content           string
+	VoteCount         int
+	ChildCommentCount int
+	Time              int64
 }
 
 type rootCommentsAPI struct {
 	Data []struct {
-		ID          any    `json:"id"`
-		Content     string `json:"content"`
-		LikeCount   int    `json:"like_count"`
-		CreatedTime int64  `json:"created_time"`
-		Author      struct {
+		ID                any    `json:"id"`
+		Content           string `json:"content"`
+		VoteCount         int    `json:"vote_count"`
+		ChildCommentCount int    `json:"child_comment_count"`
+		CreatedTime       int64  `json:"created_time"`
+		Author            struct {
 			Member *struct {
 				Name string `json:"name"`
 			} `json:"member"`
@@ -33,9 +35,8 @@ type rootCommentsAPI struct {
 
 // FetchAnswerRootComments fetches one page of top-level comments for an answer.
 func (c *Client) FetchAnswerRootComments(questionID, answerID string, offset, limit int) ([]CommentItem, bool, error) {
-	inc := "data[*].author,content,created_time,like_count"
-	u := fmt.Sprintf("%s/api/v4/answers/%s/root_comments?offset=%d&limit=%d&order=normal&include=%s",
-		BaseURL, url.PathEscape(answerID), max(0, offset), max(1, limit), url.QueryEscape(inc))
+	u := fmt.Sprintf("%s/api/v4/answers/%s/root_comments?offset=%d&limit=%d&order=normal",
+		BaseURL, url.PathEscape(answerID), max(0, offset), max(1, limit))
 	var raw rootCommentsAPI
 	if c.jsonFromCache(u, &raw) {
 		return commentsFromRootAPI(&raw)
@@ -57,11 +58,12 @@ func commentsFromRootAPI(raw *rootCommentsAPI) ([]CommentItem, bool, error) {
 			name = x.Author.Member.Name
 		}
 		out = append(out, CommentItem{
-			ID:      idString(x.ID),
-			Author:  name,
-			Content: x.Content,
-			Likes:   x.LikeCount,
-			Time:    x.CreatedTime,
+			ID:                idString(x.ID),
+			Author:            name,
+			Content:           x.Content,
+			VoteCount:         x.VoteCount,
+			ChildCommentCount: x.ChildCommentCount,
+			Time:              x.CreatedTime,
 		})
 	}
 	return out, raw.Paging.IsEnd, nil

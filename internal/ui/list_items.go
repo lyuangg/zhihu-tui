@@ -64,10 +64,11 @@ func (i commentListItem) FilterValue() string {
 
 func (i commentListItem) Title() string {
 	au := listTitleOneLine(i.c.Author)
+	meta := fmt.Sprintf("▲ %d · ↳ %d", i.c.VoteCount, i.c.ChildCommentCount)
 	if ts := formatCommentTime(i.c.Time); ts != "" {
-		return fmt.Sprintf("%s · %s · ▲ %d", ts, au, i.c.Likes)
+		return fmt.Sprintf("%s · %s · %s", ts, au, meta)
 	}
-	return fmt.Sprintf("%s · ▲ %d", au, i.c.Likes)
+	return fmt.Sprintf("%s · %s", au, meta)
 }
 
 func (i commentListItem) Description() string {
