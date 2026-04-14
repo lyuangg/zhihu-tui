@@ -158,7 +158,8 @@ func isRootCommentsURL(u string) bool {
 }
 
 // articleDetailCacheKeyPrefix 文章详情仅走专栏页 DOM，缓存键不用真实 HTTP URL。
-const articleDetailCacheKeyPrefix = "zhihu-tui:article-detail:"
+// v3：从 .ContentItem-time 解析「编辑于/发布于」等展示时间， bump 以丢弃旧缓存条目。
+const articleDetailCacheKeyPrefix = "zhihu-tui:article-detail:v3:"
 
 func articleDetailCacheKey(articleID string) string {
 	return articleDetailCacheKeyPrefix + strings.TrimSpace(articleID)

@@ -164,7 +164,10 @@ func (p *articlePage) articleMetaLine() string {
 		meta = "匿名作者"
 	}
 	meta += fmt.Sprintf("  ·  ▲ %d  ·  评论约 %d 条", p.item.Voteup, p.item.CommentCount)
-	if ts := formatCommentTime(p.item.UpdatedTime); ts != "" {
+	if ts := formatCommentTime(p.item.CreatedTime); ts != "" {
+		meta += "  ·  发布于 " + ts
+	}
+	if ts := formatCommentTime(p.item.UpdatedTime); ts != "" && p.item.UpdatedTime != p.item.CreatedTime {
 		meta += "  ·  更新于 " + ts
 	}
 	return meta
