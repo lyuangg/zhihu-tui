@@ -34,17 +34,23 @@ func (c *Client) FetchArticleDetail(articleID string) (ArticleItem, error) {
 			return out, nil
 		}
 	}
-	if err := c.PrepareArticlePage(id); err != nil {
-		return ArticleItem{}, err
-	}
-	out, err := c.fetchArticleDetailFromPage(id)
+	v, err, _ := c.jsonFlight.Do("articleDetail:"+id, func() (any, error) {
+		if err := c.PrepareArticlePage(id); err != nil {
+			return ArticleItem{}, err
+		}
+		out, err := c.fetchArticleDetailFromPage(id)
+		if err != nil {
+			return ArticleItem{}, err
+		}
+		if b, mErr := json.Marshal(out); mErr == nil {
+			c.cacheSet(cacheKey, b)
+		}
+		return out, nil
+	})
 	if err != nil {
 		return ArticleItem{}, err
 	}
-	if b, mErr := json.Marshal(out); mErr == nil {
-		c.cacheSet(cacheKey, b)
-	}
-	return out, nil
+	return v.(ArticleItem), nil
 }
 
 func (c *Client) fetchArticleDetailFromPage(articleID string) (ArticleItem, error) {

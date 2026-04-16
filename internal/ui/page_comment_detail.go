@@ -46,6 +46,8 @@ type commentDetailPage struct {
 	errStr   string
 	lastY    bool
 	loadSpin spinner.Model
+
+	inFlightReqID uint64
 }
 
 // newCommentDetailPage 用回答页传入的正文与内嵌预览初始化；若 child_comment_count>0 则再请求 child_comments 接口拉全部分页。
@@ -136,13 +138,15 @@ func (p *commentDetailPage) Init() tea.Cmd {
 	if !p.loading {
 		return nil
 	}
+	id := newAsyncReqID()
+	p.inFlightReqID = id
 	return tea.Batch(
 		func() tea.Msg {
 			items, end, err := p.api.FetchCommentChildComments(p.qid, p.aid, p.commentID, 0, commentChildLimit)
 			if err != nil {
-				return commentDone{err: err, offset: -1}
+				return commentDone{reqID: id, err: err, offset: -1}
 			}
-			return commentDone{items: items, isEnd: end, offset: 0}
+			return commentDone{reqID: id, items: items, isEnd: end, offset: 0}
 		},
 		func() tea.Msg { return p.loadSpin.Tick() },
 	)
@@ -161,6 +165,8 @@ func (p *commentDetailPage) reloadChildItems() {
 }
 
 func (p *commentDetailPage) fetchChildPageCmd(offset int) tea.Cmd {
+	id := newAsyncReqID()
+	p.inFlightReqID = id
 	qid := p.qid
 	aid := p.aid
 	cid := p.commentID
@@ -168,9 +174,9 @@ func (p *commentDetailPage) fetchChildPageCmd(offset int) tea.Cmd {
 	return func() tea.Msg {
 		cc, cEnd, err := api.FetchCommentChildComments(qid, aid, cid, offset, commentChildLimit)
 		if err != nil {
-			return commentDone{err: err, offset: -1}
+			return commentDone{reqID: id, err: err, offset: -1}
 		}
-		return commentDone{items: cc, isEnd: cEnd, offset: offset}
+		return commentDone{reqID: id, items: cc, isEnd: cEnd, offset: offset}
 	}
 }
 
@@ -184,6 +190,10 @@ func (p *commentDetailPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return p, nil
 
 	case commentDone:
+		if p.inFlightReqID == 0 || msg.reqID != p.inFlightReqID {
+			return p, nil
+		}
+		p.inFlightReqID = 0
 		p.loading = false
 		if msg.err != nil {
 			p.errStr = "加载子评论失败：" + msg.err.Error()
@@ -215,11 +225,11 @@ func (p *commentDetailPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if p.loading {
+		if cmd, ok := cmdStackBackOnLoading(msg); ok {
+			return p, cmd
+		}
 		var spinCmd tea.Cmd
 		p.loadSpin, spinCmd = p.loadSpin.Update(msg)
-		if key, ok := msg.(tea.KeyMsg); ok && shouldGlobalQuit(key) {
-			return p, tea.Quit
-		}
 		return p, spinCmd
 	}
 
@@ -344,6 +354,9 @@ func (p *commentDetailPage) childCommentPageKey(k string) (tea.Model, tea.Cmd) {
 	case "n":
 		fullPage := n >= commentChildLimit
 		if !p.cEnd || fullPage {
+			if p.loading {
+				return p, nil
+			}
 			p.errStr = ""
 			nextOff := p.cOff + commentChildLimit
 			p.loading = true
@@ -353,6 +366,9 @@ func (p *commentDetailPage) childCommentPageKey(k string) (tea.Model, tea.Cmd) {
 		return p, nil
 	case "p":
 		if p.cOff >= commentChildLimit {
+			if p.loading {
+				return p, nil
+			}
 			p.errStr = ""
 			prevOff := p.cOff - commentChildLimit
 			p.loading = true
@@ -404,7 +420,7 @@ func (p *commentDetailPage) View() string {
 		b.WriteString("\n")
 		b.WriteString(p.loadSpin.View())
 		b.WriteString(" ")
-		b.WriteString(subStyle.Render("加载子评论…"))
+		b.WriteString(subStyle.Render("加载子评论…  ·  esc / h / ← 返回"))
 		b.WriteString("\n")
 		return b.String()
 	}

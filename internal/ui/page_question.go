@@ -29,6 +29,8 @@ type questionPage struct {
 	errStr   string
 	lastY    bool
 	loadSpin spinner.Model
+
+	inFlightReqID uint64
 }
 
 func newQuestionPage(api data.API, w, h int, qid string) *questionPage {
@@ -56,10 +58,12 @@ func (p *questionPage) applyListSize() {
 }
 
 func (p *questionPage) Init() tea.Cmd {
+	id := newAsyncReqID()
+	p.inFlightReqID = id
 	return tea.Batch(
 		func() tea.Msg {
 			title, ans, isEnd, total, err := p.api.FetchQuestionPage(p.qid, p.ansOff, answerPageSize)
-			return qDone{title: title, answers: ans, total: total, isEnd: isEnd, err: err}
+			return qDone{reqID: id, title: title, answers: ans, total: total, isEnd: isEnd, err: err}
 		},
 		func() tea.Msg { return p.loadSpin.Tick() },
 	)
@@ -74,6 +78,10 @@ func (p *questionPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return p, nil
 
 	case qDone:
+		if p.inFlightReqID == 0 || msg.reqID != p.inFlightReqID {
+			return p, nil
+		}
+		p.inFlightReqID = 0
 		p.loading = false
 		if msg.err != nil {
 			p.errStr = msg.err.Error()
@@ -108,6 +116,9 @@ func (p *questionPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if p.loading {
+		if cmd, ok := cmdStackBackOnLoading(msg); ok {
+			return p, cmd
+		}
 		var spinCmd tea.Cmd
 		p.loadSpin, spinCmd = p.loadSpin.Update(msg)
 		return p, spinCmd
@@ -162,11 +173,17 @@ func (p *questionPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if strings.TrimSpace(p.qid) == "" {
 			return p, nil
 		}
+		if p.loading {
+			return p, nil
+		}
 		p.loading = true
 		p.errStr = ""
 		return p, tea.Batch(p.reloadQuestionCmd(), func() tea.Msg { return p.loadSpin.Tick() })
 	case "n":
 		if !p.ansEnd {
+			if p.loading {
+				return p, nil
+			}
 			p.loading = true
 			p.ansOff += answerPageSize
 			return p, tea.Batch(p.fetchQuestionPageCmd(), func() tea.Msg { return p.loadSpin.Tick() })
@@ -174,6 +191,9 @@ func (p *questionPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return p, nil
 	case "p":
 		if p.ansOff >= answerPageSize {
+			if p.loading {
+				return p, nil
+			}
 			p.loading = true
 			p.ansOff -= answerPageSize
 			return p, tea.Batch(p.fetchQuestionPageCmd(), func() tea.Msg { return p.loadSpin.Tick() })
@@ -191,6 +211,8 @@ func (p *questionPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (p *questionPage) reloadQuestionCmd() tea.Cmd {
+	id := newAsyncReqID()
+	p.inFlightReqID = id
 	prevIdx := p.ansIdx
 	qid := p.qid
 	off := p.ansOff
@@ -203,25 +225,27 @@ func (p *questionPage) reloadQuestionCmd() tea.Cmd {
 		api.InvalidateQuestionCache(qid, ids)
 		title, ans, isEnd, total, err := api.FetchQuestionPage(qid, off, answerPageSize)
 		if err != nil {
-			return qDone{err: err}
+			return qDone{reqID: id, err: err}
 		}
 		return qDone{
-			title: title, answers: ans, total: total, isEnd: isEnd,
+			reqID: id, title: title, answers: ans, total: total, isEnd: isEnd,
 			reloadRetain: true, prevAnsIdx: prevIdx,
 		}
 	}
 }
 
 func (p *questionPage) fetchQuestionPageCmd() tea.Cmd {
+	id := newAsyncReqID()
+	p.inFlightReqID = id
 	qid := p.qid
 	off := p.ansOff
 	api := p.api
 	return func() tea.Msg {
 		t, ans, isEnd, total, err := api.FetchQuestionPage(qid, off, answerPageSize)
 		if err != nil {
-			return qDone{err: err}
+			return qDone{reqID: id, err: err}
 		}
-		return qDone{title: t, answers: ans, total: total, isEnd: isEnd}
+		return qDone{reqID: id, title: t, answers: ans, total: total, isEnd: isEnd}
 	}
 }
 
@@ -267,7 +291,7 @@ func (p *questionPage) View() string {
 	if p.loading {
 		b.WriteString(p.loadSpin.View())
 		b.WriteString(" ")
-		b.WriteString(subStyle.Render("加载中…"))
+		b.WriteString(subStyle.Render("加载中…  ·  esc / h / ← 返回"))
 		b.WriteString("\n")
 		return b.String()
 	}

@@ -84,11 +84,11 @@ func (p *articlePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if p.loading {
+		if cmd, ok := cmdStackBackOnLoading(msg); ok {
+			return p, cmd
+		}
 		var spinCmd tea.Cmd
 		p.loadSpin, spinCmd = p.loadSpin.Update(msg)
-		if key, ok := msg.(tea.KeyMsg); ok && shouldGlobalQuit(key) {
-			return p, tea.Quit
-		}
 		return p, spinCmd
 	}
 
@@ -224,7 +224,7 @@ func (p *articlePage) View() string {
 	if p.loading {
 		b.WriteString(p.loadSpin.View())
 		b.WriteString(" ")
-		b.WriteString(subStyle.Render("加载文章详情…"))
+		b.WriteString(subStyle.Render("加载文章详情…  ·  esc / h / ← 返回"))
 		b.WriteString("\n")
 		return b.String()
 	}

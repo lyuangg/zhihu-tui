@@ -47,6 +47,8 @@ type answerPage struct {
 	errStr   string
 	lastY    bool
 	loadSpin spinner.Model
+
+	inFlightReqID uint64
 }
 
 func newAnswerPage(api data.API, w, h int, qid, qTitle string, answers []zhihu.AnswerItem, ansIdx, ansOff, ansTot int, ansEnd bool) *answerPage {
@@ -209,15 +211,17 @@ func (p *answerPage) Init() tea.Cmd {
 	if p.curAnswer == nil {
 		return nil
 	}
+	id := newAsyncReqID()
+	p.inFlightReqID = id
 	a := p.curAnswer
 	return tea.Batch(
 		func() tea.Msg {
 			md := HTMLToTerminalMarkdown(a.ContentHTML, p.answerBodyMarkdownWrapWidth())
 			cc, cEnd, err2 := p.api.FetchAnswerRootComments(p.qid, a.ID, p.cOff, commentLimit)
 			if err2 != nil {
-				return ansDone{md: md, comments: nil, cEnd: true, err: err2}
+				return ansDone{reqID: id, md: md, comments: nil, cEnd: true, err: err2}
 			}
-			return ansDone{md: md, comments: cc, cEnd: cEnd}
+			return ansDone{reqID: id, md: md, comments: cc, cEnd: cEnd}
 		},
 		func() tea.Msg { return p.loadSpin.Tick() },
 	)
@@ -234,6 +238,10 @@ func (p *answerPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return p, nil
 
 	case ansDone:
+		if p.inFlightReqID == 0 || msg.reqID != p.inFlightReqID {
+			return p, nil
+		}
+		p.inFlightReqID = 0
 		p.loading = false
 		if msg.err != nil && msg.md == "" {
 			p.errStr = "加载回答失败：" + msg.err.Error()
@@ -264,6 +272,10 @@ func (p *answerPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return p, nil
 
 	case commentDone:
+		if p.inFlightReqID == 0 || msg.reqID != p.inFlightReqID {
+			return p, nil
+		}
+		p.inFlightReqID = 0
 		p.loading = false
 		if msg.err != nil {
 			p.errStr = "加载评论失败：" + msg.err.Error()
@@ -292,11 +304,11 @@ func (p *answerPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if p.loading {
+		if cmd, ok := cmdStackBackOnLoading(msg); ok {
+			return p, cmd
+		}
 		var spinCmd tea.Cmd
 		p.loadSpin, spinCmd = p.loadSpin.Update(msg)
-		if key, ok := msg.(tea.KeyMsg); ok && shouldGlobalQuit(key) {
-			return p, tea.Quit
-		}
 		return p, spinCmd
 	}
 
@@ -357,15 +369,17 @@ func (p *answerPage) fetchCommentPageCmd(offset int) tea.Cmd {
 	if a == nil {
 		return nil
 	}
+	id := newAsyncReqID()
+	p.inFlightReqID = id
 	qid := p.qid
 	api := p.api
 	aid := a.ID
 	return func() tea.Msg {
 		cc, cEnd, err := api.FetchAnswerRootComments(qid, aid, offset, commentLimit)
 		if err != nil {
-			return commentDone{err: err, offset: -1}
+			return commentDone{reqID: id, err: err, offset: -1}
 		}
-		return commentDone{items: cc, isEnd: cEnd, offset: offset}
+		return commentDone{reqID: id, items: cc, isEnd: cEnd, offset: offset}
 	}
 }
 
@@ -467,6 +481,9 @@ func (p *answerPage) commentPageKey(k string) (tea.Model, tea.Cmd) {
 	case "n":
 		fullPage := n >= commentLimit
 		if !p.cEnd || fullPage {
+			if p.loading {
+				return p, nil
+			}
 			p.errStr = ""
 			nextOff := p.cOff + commentLimit
 			p.loading = true
@@ -476,6 +493,9 @@ func (p *answerPage) commentPageKey(k string) (tea.Model, tea.Cmd) {
 		return p, nil
 	case "p":
 		if p.cOff >= commentLimit {
+			if p.loading {
+				return p, nil
+			}
 			p.errStr = ""
 			prevOff := p.cOff - commentLimit
 			p.loading = true
@@ -547,7 +567,7 @@ func (p *answerPage) View() string {
 		_, _ = fmt.Fprintf(&b, "%s  ·  ▲ %d  ·  评论约 %d 条\n\n", a.Author, a.Voteup, a.CommentCount)
 		b.WriteString(p.loadSpin.View())
 		b.WriteString(" ")
-		b.WriteString(subStyle.Render("加载正文与评论…"))
+		b.WriteString(subStyle.Render("加载正文与评论…  ·  esc / h / ← 返回"))
 		b.WriteString("\n")
 		return b.String()
 	}

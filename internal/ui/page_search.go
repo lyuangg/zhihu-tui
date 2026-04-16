@@ -146,6 +146,9 @@ func (p *searchPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if p.loading {
+		if cmd, ok := cmdStackBackOnLoading(msg); ok {
+			return p, cmd
+		}
 		var spinCmd tea.Cmd
 		p.loadSpin, spinCmd = p.loadSpin.Update(msg)
 		return p, spinCmd
@@ -183,6 +186,9 @@ func (p *searchPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if q == "" {
 				return p, nil
 			}
+			if p.loading {
+				return p, nil
+			}
 			if qid, aid, ok := parseZhihuQuestionOrAnswerURL(q); ok {
 				p.loading = true
 				p.errStr = ""
@@ -210,6 +216,9 @@ func (p *searchPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if strings.TrimSpace(p.query) == "" {
 			return p, nil
 		}
+		if p.loading {
+			return p, nil
+		}
 		p.loading = true
 		return p, tea.Batch(p.fetchSearchCmd(p.query, p.searchOf+searchPageSize), func() tea.Msg { return p.loadSpin.Tick() })
 	case "p":
@@ -217,6 +226,9 @@ func (p *searchPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			break
 		}
 		if strings.TrimSpace(p.query) == "" || p.searchOf == 0 {
+			return p, nil
+		}
+		if p.loading {
 			return p, nil
 		}
 		p.loading = true
@@ -365,7 +377,7 @@ func (p *searchPage) View() string {
 		b.WriteString("\n\n")
 	}
 	if p.loading {
-		b.WriteString(p.loadSpin.View() + " " + subStyle.Render("搜索中…") + "\n\n")
+		b.WriteString(p.loadSpin.View() + " " + subStyle.Render("搜索中…  ·  esc / h / ← 返回") + "\n\n")
 	}
 
 	b.WriteString(p.input.View())

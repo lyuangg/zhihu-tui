@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/lyuangg/zhihu-tui/internal/bridge"
+	"golang.org/x/sync/singleflight"
 )
 
 // BaseURL is the Zhihu site origin used in API URLs.
@@ -26,6 +27,8 @@ type Client struct {
 	debug   bool
 	dbgMu   sync.Mutex
 	dbgRing []apiDebugEntry
+
+	jsonFlight singleflight.Group
 }
 
 func NewClient(b *bridge.Client) *Client {
@@ -166,16 +169,23 @@ func (c *Client) getJSON(url string, v any) error {
 		c.apiDebugPush("getJSON·cache", url, len(b), b, err)
 		return err
 	}
-	var raw json.RawMessage
-	if err := c.bridge.FetchJSON(url, &raw); err != nil {
+	raw, err, _ := c.jsonFlight.Do("json:"+url, func() (any, error) {
+		var raw json.RawMessage
+		if err := c.bridge.FetchJSON(url, &raw); err != nil {
+			return nil, err
+		}
+		payload := []byte(raw)
+		c.cacheSet(url, payload)
+		return payload, nil
+	})
+	if err != nil {
 		c.apiDebugPush("getJSON·fetch", url, 0, nil, err)
 		return err
 	}
-	payload := []byte(raw)
-	c.cacheSet(url, payload)
-	err := json.Unmarshal(payload, v)
-	c.apiDebugPush("getJSON·fetch", url, len(payload), payload, err)
-	return err
+	payload := raw.([]byte)
+	err2 := json.Unmarshal(payload, v)
+	c.apiDebugPush("getJSON·fetch", url, len(payload), payload, err2)
+	return err2
 }
 
 // getJSONHot：热榜大整数 id 需先正则再 parse。
@@ -185,22 +195,29 @@ func (c *Client) getJSONHot(url string, v any) error {
 		c.apiDebugPush("getJSONHot·cache", url, len(b), b, err)
 		return err
 	}
-	var raw json.RawMessage
-	if err := c.bridge.FetchJSONHot(url, &raw); err != nil {
+	raw, err, _ := c.jsonFlight.Do("jsonHot:"+url, func() (any, error) {
+		var raw json.RawMessage
+		if err := c.bridge.FetchJSONHot(url, &raw); err != nil {
+			return nil, err
+		}
+		payload := []byte(raw)
+		c.cacheSet(url, payload)
+		if stringsContainsHotLists(url) {
+			c.saveHotListToFile(url, payload)
+		}
+		if stringsContainsRecommend(url) {
+			c.saveRecommendToFile(url, payload)
+		}
+		return payload, nil
+	})
+	if err != nil {
 		c.apiDebugPush("getJSONHot·fetch", url, 0, nil, err)
 		return err
 	}
-	payload := []byte(raw)
-	c.cacheSet(url, payload)
-	if stringsContainsHotLists(url) {
-		c.saveHotListToFile(url, payload)
-	}
-	if stringsContainsRecommend(url) {
-		c.saveRecommendToFile(url, payload)
-	}
-	err := json.Unmarshal(payload, v)
-	c.apiDebugPush("getJSONHot·fetch", url, len(payload), payload, err)
-	return err
+	payload := raw.([]byte)
+	err2 := json.Unmarshal(payload, v)
+	c.apiDebugPush("getJSONHot·fetch", url, len(payload), payload, err2)
+	return err2
 }
 
 // PrepareHome opens the Zhihu homepage (hot API expects this context).

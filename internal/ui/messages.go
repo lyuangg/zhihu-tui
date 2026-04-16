@@ -34,6 +34,7 @@ type searchLinkDone struct {
 }
 
 type qDone struct {
+	reqID        uint64
 	title        string
 	answers      []zhihu.AnswerItem
 	total        int
@@ -44,6 +45,7 @@ type qDone struct {
 }
 
 type ansDone struct {
+	reqID    uint64
 	md       string
 	comments []zhihu.CommentItem
 	cEnd     bool
@@ -51,6 +53,7 @@ type ansDone struct {
 }
 
 type commentDone struct {
+	reqID  uint64
 	items  []zhihu.CommentItem
 	isEnd  bool
 	err    error

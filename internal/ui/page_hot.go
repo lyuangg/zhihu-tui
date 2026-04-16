@@ -93,6 +93,9 @@ func (p *hotPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if p.loading {
+		if cmd, ok := cmdStackBackOnLoading(msg); ok {
+			return p, cmd
+		}
 		var spinCmd tea.Cmd
 		p.loadSpin, spinCmd = p.loadSpin.Update(msg)
 		return p, spinCmd
@@ -126,6 +129,9 @@ func (p *hotPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "R":
 		return p, cmdForward(newRecommendPage(p.api, p.w, p.h))
 	case "r":
+		if p.loading {
+			return p, nil
+		}
 		p.loading = true
 		p.errStr = ""
 		return p, tea.Batch(
@@ -228,7 +234,7 @@ func (p *hotPage) View() string {
 	if p.loading {
 		b.WriteString(p.loadSpin.View())
 		b.WriteString(" ")
-		b.WriteString(subStyle.Render("加载中…"))
+		b.WriteString(subStyle.Render("加载中…  ·  esc / h / ← 返回（栈空时无效）"))
 		b.WriteString("\n")
 		return b.String()
 	}

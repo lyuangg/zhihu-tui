@@ -115,6 +115,9 @@ func (p *recommendPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if p.loading {
+		if cmd, ok := cmdStackBackOnLoading(msg); ok {
+			return p, cmd
+		}
 		var spinCmd tea.Cmd
 		p.loadSpin, spinCmd = p.loadSpin.Update(msg)
 		return p, spinCmd
@@ -151,6 +154,9 @@ func (p *recommendPage) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return p, cmdBack()
 	case "r":
+		if p.loading {
+			return p, nil
+		}
 		p.loading = true
 		p.errStr = ""
 		return p, tea.Batch(
@@ -216,6 +222,9 @@ func (p *recommendPage) openSelected() (tea.Model, tea.Cmd) {
 			p.errStr = "当前回答缺少问题或回答 ID"
 			return p, nil
 		}
+		if p.loading {
+			return p, nil
+		}
 		p.loading = true
 		p.errStr = ""
 		return p, tea.Batch(
@@ -278,7 +287,7 @@ func (p *recommendPage) View() string {
 	if p.loading {
 		b.WriteString(p.loadSpin.View())
 		b.WriteString(" ")
-		b.WriteString(subStyle.Render("加载推荐…"))
+		b.WriteString(subStyle.Render("加载推荐…  ·  esc / h / ← 返回"))
 		b.WriteString("\n")
 		return b.String()
 	}
